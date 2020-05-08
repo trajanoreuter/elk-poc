@@ -1,0 +1,11 @@
+/data
+.git
+.cache
+.tox
+data
+logs
+*sublime*
+.vscode
+**/*.log
+**/venv/
+**/*.pem

@@ -1,0 +1,108 @@
+version: "3"
+
+services:
+  postgres:
+    container_name: 'postgres'
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: abc12345678
+    volumes:
+      - ./postgres/config/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - elk
+    expose:
+      - 5432
+    ports:
+      - 5432:5432
+
+  elasticsearch:
+    hostname: elasticsearch
+    container_name: elasticsearch
+    build:
+      context: ./elasticsearch
+      dockerfile: Dockerfile
+    ports:
+      - 9200:9200
+      - 9300:9300
+    depends_on:
+      - postgres
+    environment:
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+      discovery.type: "single-node"
+      cluster.name: es-cluster
+      bootstrap.memory_lock: "true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+     - dataes:/usr/share/elasticsearch/data
+    networks:
+      - elk
+
+  kibana:
+    container_name: kibana
+    build:
+      context: ./kibana
+      dockerfile: Dockerfile
+    depends_on:
+      - elasticsearch
+    ports:
+      - 5601:5601
+    environment:
+      xpack.security.enabled: "false"
+      discovery.type: "single-node"
+      LOGGING_QUIET: "true"
+    networks:
+      - elk
+
+  logstash:
+    container_name: logstash
+    build:
+      context: ./logstash
+      dockerfile: Dockerfile
+    depends_on:
+      - elasticsearch
+      - postgres
+    links:
+      - postgres
+      - elasticsearch
+    volumes:
+      - ./logstash/config:/usr/share/logstash/config/
+      - ./pipelines:/usr/share/logstash/pipeline/
+      - logstashdata:/mnt/data
+
+    ports:
+      - 5044:5044
+    networks:
+      - elk
+
+  # filebeat:
+  #   container_name: filebeat
+  #   build:
+  #     context: ./filebeat
+  #     dockerfile: Dockerfile
+  #   volumes:
+  #     # needed to access all docker logs (read only) :
+  #    - "/var/lib/docker/containers:/usr/share/dockerlogs/data:ro"
+  #   depends_on:
+  #     - elasticsearch
+  #   networks:
+  #     - elk
+
+
+volumes:
+  dataes:
+    driver: local
+  logstashdata:
+    driver: local
+
+networks:
+  elk:
+    driver: bridge
