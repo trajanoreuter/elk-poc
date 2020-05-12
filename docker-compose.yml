@@ -1,24 +1,24 @@
 version: "3"
 
 services:
-  postgres:
-    container_name: 'postgres'
-    build:
-      context: ./postgres
-      dockerfile: Dockerfile
-    restart: always
-    environment:
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: abc12345678
-    volumes:
-      - ./postgres/config/init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - elk
-    expose:
-      - 5432
-    ports:
-      - 5432:5432
+  # postgres:
+  #   container_name: 'postgres'
+  #   build:
+  #     context: ./postgres
+  #     dockerfile: Dockerfile
+  #   restart: always
+  #   environment:
+  #     POSTGRES_DB: postgres
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: abc12345678
+  #   volumes:
+  #     - ./postgres/config/init.sql:/docker-entrypoint-initdb.d/init.sql
+  #   networks:
+  #     - elk
+  #   expose:
+  #     - 5432
+  #   ports:
+  #     - 5432:5432
 
   elasticsearch:
     hostname: elasticsearch
@@ -30,7 +30,7 @@ services:
       - 9200:9200
       - 9300:9300
     depends_on:
-      - postgres
+      - rabbitmq
     environment:
       xpack.security.enabled: "false"
       ES_JAVA_OPTS: "-Xms1g -Xmx1g"
@@ -53,6 +53,7 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - elasticsearch
+      - logstash
     ports:
       - 5601:5601
     environment:
@@ -69,19 +70,36 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - elasticsearch
-      - postgres
+      - rabbitmq
     links:
-      - postgres
+      - rabbitmq
       - elasticsearch
     volumes:
       - ./logstash/config:/usr/share/logstash/config/
       - ./pipelines:/usr/share/logstash/pipeline/
       - logstashdata:/mnt/data
-
     ports:
       - 5044:5044
     networks:
       - elk
+
+  rabbitmq:
+    container_name: rabbitmq
+    build:
+      context: ./rabbitMQ
+      dockerfile: Dockerfile
+    environment:
+      RABBITMQ_DEFAULT_USER: test
+      RABBITMQ_DEFAULT_PASS: test
+      RABBITMQ_DEFAULT_VHOST: test
+    ports:
+      - 15672:15672
+      - 5672:5672
+    volumes:
+      - rabbitdata:/var/lib/rabbitmq/mnesia
+    networks:
+      - elk
+
 
   # filebeat:
   #   container_name: filebeat
@@ -101,6 +119,8 @@ volumes:
   dataes:
     driver: local
   logstashdata:
+    driver: local
+  rabbitdata:
     driver: local
 
 networks:
